@@ -114,6 +114,20 @@ void wlr_output_state_set_layers(struct wlr_output_state *state,
 	state->layers_len = layers_len;
 }
 
+void wlr_output_state_set_wait_timeline(struct wlr_output_state *state,
+		struct wlr_render_timeline *timeline, uint64_t src_point) {
+	state->committed |= WLR_OUTPUT_STATE_WAIT_TIMELINE;
+	state->wait_timeline = timeline;
+	state->wait_point = src_point;
+}
+
+void wlr_output_state_set_signal_timeline(struct wlr_output_state *state,
+		struct wlr_render_timeline *timeline, uint64_t dst_point) {
+	state->committed |= WLR_OUTPUT_STATE_SIGNAL_TIMELINE;
+	state->signal_timeline = timeline;
+	state->signal_point = dst_point;
+}
+
 bool wlr_output_state_copy(struct wlr_output_state *dst,
 		const struct wlr_output_state *src) {
 	struct wlr_output_state copy = *src;
