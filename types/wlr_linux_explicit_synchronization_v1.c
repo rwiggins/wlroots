@@ -5,6 +5,7 @@
 #include <wlr/render/timeline.h>
 #include <wlr/types/wlr_linux_explicit_synchronization_v1.h>
 #include <wlr/types/wlr_compositor.h>
+#include "render/dmabuf.h"
 #include "linux-explicit-synchronization-unstable-v1-protocol.h"
 
 #define LINUX_EXPLICIT_SYNCHRONIZATION_V1_VERSION 2
@@ -326,13 +327,28 @@ bool wlr_linux_explicit_synchronization_v1_signal_surface_timeline(
 		uint64_t dst_point) {
 	struct wlr_linux_surface_synchronization_v1 *surface_sync =
 		surface_sync_from_surface(explicit_sync, surface);
-	if (!surface_sync) {
-		// TODO: fallback to DMA-BUF fence export
+	if (surface_sync) {
+		return wlr_render_timeline_import_sync_file(timeline, dst_point,
+			surface_sync->current.acquire_fence_fd);
+	}
+
+	// Client doesn't support explicit sync, try to extract the fence from the
+	// DMA-BUF
+	struct wlr_dmabuf_attributes dmabuf = {0};
+	if (surface->buffer == NULL ||
+			!wlr_buffer_get_dmabuf(&surface->buffer->base, &dmabuf)) {
 		return false;
 	}
 
-	return wlr_render_timeline_import_sync_file(timeline, dst_point,
-		surface_sync->current.acquire_fence_fd);
+	// TODO: maybe we should wait on all planes?
+	int sync_file_fd = dmabuf_export_sync_file(dmabuf.fd[0], DMA_BUF_SYNC_READ);
+	if (sync_file_fd < 0) {
+		return false;
+	}
+
+	bool ok = wlr_render_timeline_import_sync_file(timeline, dst_point, sync_file_fd);
+	close(sync_file_fd);
+	return ok;
 }
 
 bool wlr_linux_explicit_synchronization_v1_wait_surface_timeline(
