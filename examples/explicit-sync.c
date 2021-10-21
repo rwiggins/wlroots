@@ -14,6 +14,7 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_linux_explicit_synchronization_v1.h>
+#include <wlr/types/wlr_linux_explicit_synchronization_v2.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
@@ -29,6 +30,7 @@ struct server {
 	struct wlr_allocator *allocator;
 	struct wlr_renderer *renderer;
 	struct wlr_linux_explicit_synchronization_v1 *explicit_sync_v1;
+	struct wlr_linux_explicit_sync_v2 *explicit_sync_v2;
 
 	struct wl_list outputs;
 	struct wl_list surfaces;
@@ -87,19 +89,35 @@ static void output_handle_frame(struct wl_listener *listener, void *data) {
 			continue;
 		}
 
-		uint64_t surface_point = surface->wlr->current.seq;
-		if (!wlr_linux_explicit_synchronization_v1_signal_surface_timeline(
-				output->server->explicit_sync_v1, surface->wlr,
-				surface->timeline, surface_point)) {
-			wlr_log(WLR_ERROR, "Failed to signal surface timeline");
-			continue;
+		struct wlr_render_timeline *wait_timeline = NULL;
+		uint64_t wait_point = 0;
+		struct wlr_linux_surface_sync_v2_state *sync_v2_state =
+			wlr_linux_explicit_sync_v2_get_surface_state(
+			output->server->explicit_sync_v2, surface->wlr);
+		if (sync_v2_state != NULL) {
+			if (sync_v2_state->acquire_timeline == NULL) {
+				wlr_log(WLR_ERROR, "Missing acquire sync point");
+				continue;
+			}
+			wait_timeline = sync_v2_state->acquire_timeline;
+			wait_point = sync_v2_state->acquire_point;
+		} else {
+			uint64_t surface_point = surface->wlr->current.seq;
+			if (!wlr_linux_explicit_synchronization_v1_signal_surface_timeline(
+					output->server->explicit_sync_v1, surface->wlr,
+					surface->timeline, surface_point)) {
+				wlr_log(WLR_ERROR, "Failed to signal surface timeline");
+				continue;
+			}
+			wait_timeline = surface->timeline;
+			wait_point = surface_point;
 		}
 
 		wlr_render_pass_add_texture(pass, &(struct wlr_render_texture_options){
 			.texture = texture,
 			.dst_box = { .x = pos, .y = pos },
-			.wait_timeline = surface->timeline,
-			.wait_point = surface_point,
+			.wait_timeline = wait_timeline,
+			.wait_point = wait_point,
 		});
 
 		wlr_surface_send_frame_done(surface->wlr, &now);
@@ -117,6 +135,17 @@ static void output_handle_frame(struct wl_listener *listener, void *data) {
 	wlr_output_state_finish(&state);
 
 	wl_list_for_each(surface, &output->server->surfaces, link) {
+		struct wlr_linux_surface_sync_v2_state *sync_v2_state =
+			wlr_linux_explicit_sync_v2_get_surface_state(
+			output->server->explicit_sync_v2, surface->wlr);
+		if (sync_v2_state != NULL && sync_v2_state->release_timeline != NULL) {
+			if (!wlr_render_timeline_transfer(sync_v2_state->release_timeline,
+					sync_v2_state->release_point, output->out_timeline,
+					output_point)) {
+				wlr_log(WLR_ERROR, "Failed to transfer surface release timeline");
+			}
+		}
+
 		if (!wlr_linux_explicit_synchronization_v1_wait_surface_timeline(
 				output->server->explicit_sync_v1, surface->wlr,
 				output->out_timeline, output_point)) {
@@ -220,6 +249,10 @@ int main(int argc, char *argv[]) {
 	wlr_xdg_shell_create(server.display, 2);
 
 	server.explicit_sync_v1 = wlr_linux_explicit_synchronization_v1_create(server.display);
+
+	int drm_fd = wlr_renderer_get_drm_fd(server.renderer);
+	server.explicit_sync_v2 =
+		wlr_linux_explicit_sync_v2_create(server.display, drm_fd);
 
 	wl_list_init(&server.outputs);
 	wl_list_init(&server.surfaces);
