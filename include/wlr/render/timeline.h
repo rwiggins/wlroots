@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+struct wl_event_loop;
+
 /**
  * A synchronization timeline.
  *
@@ -26,6 +28,8 @@
  */
 struct wlr_render_timeline;
 
+typedef void (*wlr_render_timeline_wait_func_t)(void *data);
+
 /**
  * Create a new synchronization timeline.
  */
@@ -46,6 +50,14 @@ void wlr_render_timeline_destroy(struct wlr_render_timeline *timeline);
  */
 bool wlr_render_timeline_transfer(struct wlr_render_timeline *dst,
 	uint64_t dst_point, struct wlr_render_timeline *src, uint64_t src_point);
+/**
+ * Asynchronously wait for a timeline point.
+ *
+ * Flags can only be DRM_SYNCOBJ_WAIT_FLAGS_WAIT_AVAILABLE.
+ */
+struct wl_event_source *wlr_render_timeline_wait(struct wlr_render_timeline *timeline,
+	uint64_t point, uint32_t flags, struct wl_event_loop *loop,
+	wlr_render_timeline_wait_func_t func, void *data);
 /**
  * Export a timeline point as a sync_file FD.
  *
