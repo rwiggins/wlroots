@@ -30,6 +30,15 @@ struct wlr_render_timer;
 struct wlr_buffer_pass_options {
 	/* Timer to measure the duration of the render pass */
 	struct wlr_render_timer *timer;
+
+	/* Signal a timeline synchronization point when the render pass completes.
+	 *
+	 * When a compositor provides a signal timeline, the renderer may skip
+	 * implicit signal synchronization. Compositors are not allowed to mix
+	 * implicit and explicit signal synchronization usage.
+	 */
+	struct wlr_render_timeline *signal_timeline;
+	uint64_t signal_point;
 };
 
 /**
@@ -85,6 +94,15 @@ struct wlr_render_texture_options {
 	enum wlr_scale_filter_mode filter_mode;
 	/* Blend mode */
 	enum wlr_render_blend_mode blend_mode;
+
+	/* Wait for a timeline synchronization point before texturing.
+	 *
+	 * When a compositor calls wlr_renderer_wait_timeline(), the renderer may
+	 * skip implicit wait synchronization. Compositors are not allowed to mix
+	 * implicit and explicit wait synchronization usage.
+	 */
+	struct wlr_render_timeline *wait_timeline;
+	uint64_t wait_point;
 };
 
 /**
