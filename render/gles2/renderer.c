@@ -569,7 +569,8 @@ static struct wlr_render_pass *gles2_begin_buffer_pass(struct wlr_renderer *wlr_
 		return NULL;
 	}
 
-	struct wlr_gles2_render_pass *pass = begin_gles2_buffer_pass(buffer, timer);
+	struct wlr_gles2_render_pass *pass = begin_gles2_buffer_pass(buffer, timer,
+		options->signal_timeline, options->signal_point);
 	if (!pass) {
 		return NULL;
 	}
