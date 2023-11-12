@@ -51,6 +51,10 @@ compositors = {
 		],
 		'dep': [wayland_client, wayland_egl, egl, glesv2],
 	},
+	'explicit-sync': {
+		'src': 'explicit-sync.c',
+		'proto': ['xdg-shell'],
+	},
 }
 
 foreach name, info : compositors

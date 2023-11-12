@@ -65,6 +65,8 @@ enum wlr_output_state_field {
 	WLR_OUTPUT_STATE_RENDER_FORMAT = 1 << 8,
 	WLR_OUTPUT_STATE_SUBPIXEL = 1 << 9,
 	WLR_OUTPUT_STATE_LAYERS = 1 << 10,
+	WLR_OUTPUT_STATE_WAIT_TIMELINE = 1 << 11,
+	WLR_OUTPUT_STATE_SIGNAL_TIMELINE = 1 << 12,
 };
 
 enum wlr_output_state_mode_type {
@@ -108,6 +110,13 @@ struct wlr_output_state {
 
 	struct wlr_output_layer_state *layers;
 	size_t layers_len;
+
+	// only valid if WLR_OUTPUT_STATE_WAIT_TIMELINE
+	struct wlr_render_timeline *wait_timeline;
+	uint64_t wait_point;
+	// only valid if WLR_OUTPUT_STATE_SIGNAL_TIMELINE
+	struct wlr_render_timeline *signal_timeline;
+	uint64_t signal_point;
 };
 
 struct wlr_output_impl;
@@ -696,6 +705,31 @@ void wlr_output_state_set_damage(struct wlr_output_state *state,
  */
 void wlr_output_state_set_layers(struct wlr_output_state *state,
 	struct wlr_output_layer_state *layers, size_t layers_len);
+/**
+ * Set a timeline point to wait on before displaying the next frame.
+ *
+ * The timeline must continue to remain valid until the next call to
+ * wlr_output_commit() or wlr_output_rollback(). Committing a wait timeline
+ * point without a buffer is invalid.
+ *
+ * There is only a single wait timeline point, waiting for multiple timeline
+ * points is unsupported.
+ */
+void wlr_output_state_set_wait_timeline(struct wlr_output_state *state,
+	struct wlr_render_timeline *timeline, uint64_t src_point);
+/**
+ * Set a timeline point to be signalled when the frame is no longer being used
+ * by the backend.
+ *
+ * The timeline must continue to remain valid until the next call to
+ * wlr_output_commit() or wlr_output_rollback(). Committing a signal timeline
+ * point without a buffer is invalid.
+ *
+ * There is only a single signal timeline point, signalling multiple timeline
+ * points is unsupported.
+ */
+void wlr_output_state_set_signal_timeline(struct wlr_output_state *state,
+	struct wlr_render_timeline *timeline, uint64_t dst_point);
 
 /**
  * Copies the output state from src to dst. It is safe to then
