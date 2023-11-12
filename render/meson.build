@@ -22,6 +22,8 @@ else
 	wlr_files += files('dmabuf_fallback.c')
 endif
 
+internal_config.set10('HAVE_EVENTFD', cc.has_header('sys/eventfd.h'))
+
 if 'gles2' in renderers or 'auto' in renderers
 	egl = dependency('egl', required: 'gles2' in renderers)
 	gbm = dependency('gbm', required: 'gles2' in renderers)
