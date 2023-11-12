@@ -167,7 +167,7 @@ struct wl_event_source *wlr_render_timeline_wait(struct wlr_render_timeline *tim
 		uint64_t point, uint32_t flags, struct wl_event_loop *loop,
 		wlr_render_timeline_wait_func_t func, void *data) {
 	uint32_t signaled_point;
-	int ret = drmSyncobjWait(timeline->drm_fd, &timeline->handle, 1, 0, flags, &signaled_point);
+	int ret = drmSyncobjTimelineWait(timeline->drm_fd, &timeline->handle, &point, 1, 0, flags, &signaled_point);
 	if (ret == 0) {
 		func(data);
 		return NULL;
